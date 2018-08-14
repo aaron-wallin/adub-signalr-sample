@@ -33,19 +33,6 @@ namespace adub_signalr_sample
                 
             }));
 
-            //services.Configure<CookiePolicyOptions>(options =>
-            //{
-                // This lambda determines whether user consent for non-essential cookies is needed for a given request.
-           //     options.CheckConsentNeeded = context => true;
-           //     options.MinimumSameSitePolicy = SameSiteMode.None;
-            //});
-
-            
-            //services.AddDistributedRedisCache(o => {
-            //    o.Configuration = GetRedisConnectionString();
-            //    o.InstanceName = "DistributedSessionCache";
-            //});
-
             services.AddDistributedMemoryCache();
             services.AddSession(options =>
             {
@@ -56,11 +43,6 @@ namespace adub_signalr_sample
                 options.Cookie.Name = "JSESSIONID";
             });
 
-            //services.AddDistributedRedisCache(o => {
-            //    o.Configuration = GetRedisConnectionString();
-            //    o.InstanceName = "DistributedSessionCache";
-            //});
-            
             services.ConfigureApplicationCookie(options => {
                 options.Cookie.Name = "JSESSIONID";
                 options.Cookie.HttpOnly = true;
@@ -68,23 +50,6 @@ namespace adub_signalr_sample
             });
 
             services.AddSignalR().AddRedis(GetRedisConnectionString());
-        }
-
-        private string GetRedisConnectionString()
-        {
-            var credentials = "$..[?(@.name=='signalr-sync-cache')].credentials";
-            var jObj = JObject.Parse(Environment.GetEnvironmentVariable("VCAP_SERVICES"));
-
-            if (jObj.SelectToken($"{credentials}") == null)
-                throw new Exception("Expects a PCF managed redis cache service binding named 'signalr-sync-cache'");
-
-            var host = (string)jObj.SelectToken($"{credentials}.host");
-            var pwd = (string)jObj.SelectToken($"{credentials}.password");
-            var port = (string)jObj.SelectToken($"{credentials}.port");
-
-            Console.Out.WriteLine($"{host}:{port},password={pwd},allowAdmin=true");
-
-            return $"{host}:{port},password={pwd},allowAdmin=true";
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -127,6 +92,24 @@ namespace adub_signalr_sample
             {
                 routes.MapHub<ChatHub>("/chatHub");
             });
+        }
+
+        // Retreive connection string to PCF managed Redis cache
+        private string GetRedisConnectionString()
+        {
+            var credentials = "$..[?(@.name=='signalr-sync-cache')].credentials";
+            var jObj = JObject.Parse(Environment.GetEnvironmentVariable("VCAP_SERVICES"));
+
+            if (jObj.SelectToken($"{credentials}") == null)
+                throw new Exception("Expects a PCF managed redis cache service binding named 'signalr-sync-cache'");
+
+            var host = (string)jObj.SelectToken($"{credentials}.host");
+            var pwd = (string)jObj.SelectToken($"{credentials}.password");
+            var port = (string)jObj.SelectToken($"{credentials}.port");
+
+            Console.Out.WriteLine($"{host}:{port},password={pwd},allowAdmin=true");
+
+            return $"{host}:{port},password={pwd},allowAdmin=true";
         }
     }
 }
