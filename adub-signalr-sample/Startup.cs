@@ -12,34 +12,62 @@ namespace adub_signalr_sample
 {
     public class Startup
     {
+        public IConfiguration Configuration { get; }
+        private string corsPolicyName = "CorsPolicy";
+
         public Startup(IConfiguration configuration)
         {
             Configuration = configuration;
         }
-
-        public IConfiguration Configuration { get; }
-
+        
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.Configure<CookiePolicyOptions>(options =>
-            {
+            services.AddCors(options => options.AddPolicy(corsPolicyName, 
+            builder => 
+             {
+                builder.WithOrigins("https://adub-signalr-client.apps.pcf.sandbox.cudirect.com")
+                        .AllowAnyMethod()
+                        .AllowAnyHeader()
+                        .AllowCredentials();
+                
+            }));
+
+            //services.Configure<CookiePolicyOptions>(options =>
+            //{
                 // This lambda determines whether user consent for non-essential cookies is needed for a given request.
-                options.CheckConsentNeeded = context => true;
-                options.MinimumSameSitePolicy = SameSiteMode.None;
+           //     options.CheckConsentNeeded = context => true;
+           //     options.MinimumSameSitePolicy = SameSiteMode.None;
+            //});
+
+            
+            //services.AddDistributedRedisCache(o => {
+            //    o.Configuration = GetRedisConnectionString();
+            //    o.InstanceName = "DistributedSessionCache";
+            //});
+
+            services.AddDistributedMemoryCache();
+            services.AddSession(options =>
+            {
+                // Set a short timeout for easy testing.
+                options.IdleTimeout = TimeSpan.FromSeconds(30);
+                options.Cookie.HttpOnly = true;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                options.Cookie.Name = "JSESSIONID";
+            });
+
+            //services.AddDistributedRedisCache(o => {
+            //    o.Configuration = GetRedisConnectionString();
+            //    o.InstanceName = "DistributedSessionCache";
+            //});
+            
+            services.ConfigureApplicationCookie(options => {
+                options.Cookie.Name = "JSESSIONID";
+                options.Cookie.HttpOnly = true;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
             });
 
             services.AddSignalR().AddRedis(GetRedisConnectionString());
-
-            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
-
-            //services.AddCors(options => options.AddPolicy("CorsPolicy", 
-            //builder => 
-            // {
-            //    builder.AllowAnyMethod().AllowAnyHeader()
-            //           .WithOrigins("https://adub-signalr-sample.apps.pcf.sandbox.cudirect.com")
-            //          .AllowCredentials();
-            //}));
         }
 
         private string GetRedisConnectionString()
@@ -62,6 +90,15 @@ namespace adub_signalr_sample
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IHostingEnvironment env)
         {
+            Console.WriteLine("Adding cors in configure...");
+            app.UseCors(builder => 
+            {
+                builder.AllowAnyHeader()
+                        .AllowAnyMethod()
+                        .WithOrigins("https://adub-signalr-client.apps.pcf.sandbox.cudirect.com")
+                        .AllowCredentials();
+            });
+
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
@@ -71,15 +108,25 @@ namespace adub_signalr_sample
                 app.UseExceptionHandler("/Error");
             }
 
-            app.UseStaticFiles();
-            app.UseCookiePolicy();
-            //app.UseCors("CorsPolicy");
+            var so = new SessionOptions();
+            so.Cookie.HttpOnly = true;
+            so.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+            so.Cookie.Name = "JSESSIONID";
+            so.IdleTimeout = TimeSpan.FromSeconds(30);
+            app.UseSession(options: so);
+
+           app.Use(async (context, next) =>
+           {
+                 var sessionGuid = Guid.NewGuid().ToString();
+                Console.WriteLine("Setting sessionid " + sessionGuid);
+                context.Session.SetString("JSESSIONID", sessionGuid);
+                await next();
+            });
+    
             app.UseSignalR(routes =>
             {
                 routes.MapHub<ChatHub>("/chatHub");
             });
-
-            app.UseMvc();
         }
     }
 }
