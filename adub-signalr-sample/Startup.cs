@@ -13,49 +13,46 @@ namespace adub_signalr_sample
     public class Startup
     {
         public IConfiguration Configuration { get; }
-        private string corsPolicyName = "CorsPolicy";
-
+        
         public Startup(IConfiguration configuration)
         {
             Configuration = configuration;
         }
         
-        // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddCors(options => options.AddPolicy(corsPolicyName, 
-            builder => 
-             {
-                builder.WithOrigins("https://adub-signalr-client.apps.pcf.sandbox.cudirect.com")
+            // Not sure why, but seem to need to configure corspolicybuilder here as well as
+            // in Configure method.  Adding same builder configuration.
+            services.AddCors(options => options.AddPolicy("CorsPolicy", builder =>
+            {
+                builder.AllowAnyHeader()
                         .AllowAnyMethod()
-                        .AllowAnyHeader()
+                        .WithOrigins("https://adub-signalr-client.apps.pcf.sandbox.cudirect.com")
                         .AllowCredentials();
-                
             }));
 
+            // Add distributed cache which is required for session state
             services.AddDistributedMemoryCache();
+
+            // Add session service and specify JSESSIONID for cookie name
+            // This is used during negotiation phase for sticky sessions on PCF
+            // Not ideal, but seems to be required by SignalR for negotiation
             services.AddSession(options =>
             {
-                // Set a short timeout for easy testing.
                 options.IdleTimeout = TimeSpan.FromSeconds(30);
                 options.Cookie.HttpOnly = true;
                 options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
                 options.Cookie.Name = "JSESSIONID";
             });
 
-            services.ConfigureApplicationCookie(options => {
-                options.Cookie.Name = "JSESSIONID";
-                options.Cookie.HttpOnly = true;
-                options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-            });
-
+            // Add SignalR service with redis backplane
             services.AddSignalR().AddRedis(GetRedisConnectionString());
         }
 
-        // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IHostingEnvironment env)
         {
-            Console.WriteLine("Adding cors in configure...");
+            // Not sure why, but seem to need to configure corspolicybuilder here as well as
+            // in ConfigureServices method. Adding same builder configuration.
             app.UseCors(builder => 
             {
                 builder.AllowAnyHeader()
@@ -65,29 +62,23 @@ namespace adub_signalr_sample
             });
 
             if (env.IsDevelopment())
-            {
                 app.UseDeveloperExceptionPage();
-            }
             else
-            {
                 app.UseExceptionHandler("/Error");
-            }
 
-            var so = new SessionOptions();
-            so.Cookie.HttpOnly = true;
-            so.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-            so.Cookie.Name = "JSESSIONID";
-            so.IdleTimeout = TimeSpan.FromSeconds(30);
-            app.UseSession(options: so);
+            // Use session service
+            app.UseSession();
 
-           app.Use(async (context, next) =>
-           {
-                 var sessionGuid = Guid.NewGuid().ToString();
+            // Custom use method to add a value to the session cookie
+            app.Use(async (context, next) =>
+            {
+                var sessionGuid = Guid.NewGuid().ToString();
                 Console.WriteLine("Setting sessionid " + sessionGuid);
                 context.Session.SetString("JSESSIONID", sessionGuid);
                 await next();
             });
     
+            // Map SignalR routes
             app.UseSignalR(routes =>
             {
                 routes.MapHub<ChatHub>("/chatHub");
