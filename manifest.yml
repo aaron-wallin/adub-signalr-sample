@@ -1,9 +1,11 @@
 ---
 applications:
-- name: adub-signalr
+- name: adub-signalr-hub
   buildpack: dotnet_core_buildpack
   health-check-type: process
   memory: 512M
   instances: 4
   routes:
-  - route: https://adub-signalr-sample.apps.pcf.sandbox.cudirect.com
+  - route: https://adub-signalr-hub.apps.pcf.nonprod.cudirect.com
+  services:
+  - signalr-sync-cache

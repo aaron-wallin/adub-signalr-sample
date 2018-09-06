@@ -27,7 +27,7 @@ namespace adub_signalr_sample
             {
                 builder.AllowAnyHeader()
                         .AllowAnyMethod()
-                        .WithOrigins("https://adub-signalr-client.apps.pcf.sandbox.cudirect.com")
+                        .WithOrigins("https://adub-signalr-client.apps.pcf.nonprod.cudirect.com", "http://adub-signalr-client.apps.pcf.nonprod.cudirect.com")
                         .AllowCredentials();
             }));
 
@@ -57,7 +57,7 @@ namespace adub_signalr_sample
             {
                 builder.AllowAnyHeader()
                         .AllowAnyMethod()
-                        .WithOrigins("https://adub-signalr-client.apps.pcf.sandbox.cudirect.com")
+                        .WithOrigins("https://adub-signalr-client.apps.pcf.nonprod.cudirect.com", "http://adub-signalr-client.apps.pcf.nonprod.cudirect.com")
                         .AllowCredentials();
             });
 

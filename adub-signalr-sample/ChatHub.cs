@@ -7,10 +7,31 @@ namespace adub_signalr_sample
 {
     public class ChatHub : Hub
     {
-        public async Task SendMessage(string user, string message)
+        public async Task SendMessage(string to, string from, string message)
         {
-            await Console.Out.WriteLineAsync($"Processing message from {user} : {message}");
-            await Clients.All.SendAsync("ReceiveMessage", user, message);
+            if (!string.IsNullOrWhiteSpace(to) || !string.IsNullOrWhiteSpace(from) || !string.IsNullOrWhiteSpace(message))
+            {
+                await Console.Out.WriteLineAsync($"Processing message from:{from} to:{to} message:{message}");
+
+                if (to.ToLower() == "*")
+                {                    
+                    await Clients.All.SendAsync("ReceiveMessage", from, message);
+                }
+                else
+                {
+                    await Clients.Group(to.ToLower()).SendAsync("ReceiveMessage", from, message);
+                }
+            }
+        }
+
+        public async Task RegisterUser(string user)
+        {
+            if (string.IsNullOrWhiteSpace(user))
+                await Task.CompletedTask;
+
+            await Console.Out.WriteLineAsync($"Registering {user} : {Context.ConnectionId}");
+            await Groups.AddToGroupAsync(Context.ConnectionId, user?.ToLower());
+            await Clients.All.SendAsync("ReceiveMessage", "SYSTEM", $"A new user registered: {user?.ToLower()}");
         }
 
         public override async Task OnDisconnectedAsync(Exception exception)
